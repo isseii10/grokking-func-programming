@@ -233,13 +233,12 @@ def parseShowsV5(rawShows: List[String]): Either[String, List[TvShow]] = {
   rawShows.map(parseShowV4).foldLeft(initialResult)(addOrResignV2)
 }
 
-// all or nothingのエラー処理方針
 def addOrResignV2(
     parsedShows: Either[String, List[TvShow]],
     newParsedShow: Either[String, TvShow]
 ): Either[String, List[TvShow]] = {
   for {
-    shows <- parsedShows // Option[List[TvShow]]からList[TvShow]を取り出す
-    newShow <- newParsedShow // Option[TvShow]からTvShowを取り出す
-  } yield shows.appended(newShow) // ジェネレータがOption[]なので最後もOptionになる
+    shows <- parsedShows
+    newShow <- newParsedShow
+  } yield shows.appended(newShow)
 }

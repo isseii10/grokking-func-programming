@@ -3,7 +3,7 @@
 // 各検索では、ジャンル、出身地、活動期間など、条件の様々な組み合わせをサポートしなければならない
 // 音楽アーティストには名前、ジャンル、出身地、活動開始年、活動停止年がある
 
-object model {
+object modelArtist {
   opaque type Location = String
   object Location {
     def apply(s: String): Location = s // コンストラクタ
@@ -18,44 +18,65 @@ object model {
         a: Genre
     ) def name: String = a
   }
-  opaque type YearActiveStart = Int
-  object YearActiveStart {
-    def apply(s: Int): YearActiveStart = s
-    extension (
-        a: YearActiveStart
-    ) def value: Int = a
-  }
-  opaque type YearActiveEnd = Int
-  object YearActiveEnd {
-    def apply(s: Int): YearActiveEnd = s
-    extension (
-        a: YearActiveEnd
-    ) def value: Int = a
-  }
+
 }
 
-import model._
+enum MusicGenre {
+  case HeavyMetal
+  case Pop
+  case HardRock
+}
+
+enum YearsActive {
+  case StillActive(since: Int)
+  case ActiveBetween(start: Int, end: Int)
+}
+
+import modelArtist._
+import YearsActive._
 
 case class Artist(
     name: String,
-    genre: String,
+    genre: MusicGenre,
     origin: Location,
-    yearsActiveStart: Int,
-    yearsActiveEnd: Option[Int]
+    yearsActive: YearsActive
 )
+
+def wasArtistActive(artist: Artist, yearStart: Int, yearEnd: Int): Boolean = {
+  artist.yearsActive match
+    case StillActive(since)        => since <= yearEnd
+    case ActiveBetween(start, end) => start >= yearEnd && end >= yearStart
+}
+
+enum SearchCondition {
+  case SearchByGenre(genres: List[MusicGenre])
+  case SearchByOrigin(origins: List[Location])
+  case SearchByActiveYear(start: Int, end: Int)
+}
+
+import SearchCondition._
 
 def searchArtists(
     artists: List[Artist],
-    genres: List[String],
-    locations: List[String],
-    searchByActiveYear: Boolean,
-    activeAfter: Int,
-    activeBefore: Int
+    requiredConditions: List[SearchCondition]
 ): List[Artist] = {
   artists.filter(artist =>
-    (genres.isEmpty || genres.contains(artist.genre)) &&
-      (locations.isEmpty || locations.contains(artist.origin.name)) &&
-      (!searchByActiveYear || (artist.yearsActiveEnd
-        .forall(_ >= activeAfter)) && (artist.yearsActiveStart <= activeBefore))
+    requiredConditions.forall(requiredCondition =>
+      requiredCondition match {
+        case SearchByGenre(genres) =>
+          genres.contains(artist.genre)
+        case SearchByOrigin(origins) =>
+          origins.contains(artist.origin)
+        case SearchByActiveYear(start, end) =>
+          wasArtistActive(artist, start, end)
+      }
+    )
   )
+}
+
+// パターンマッチング練習
+def activeLength(artist: Artist, currentYear: Int): Int = {
+  artist.yearsActive match
+    case StillActive(sinse)        => currentYear - sinse
+    case ActiveBetween(start, end) => end - start
 }

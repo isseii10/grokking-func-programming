@@ -39,13 +39,15 @@ case class Artist(
     name: String,
     genre: MusicGenre,
     origin: Location,
-    yearsActive: YearsActive
+    yearsActives: List[YearsActive]
 )
 
 def wasArtistActive(artist: Artist, yearStart: Int, yearEnd: Int): Boolean = {
-  artist.yearsActive match
-    case StillActive(since)        => since <= yearEnd
-    case ActiveBetween(start, end) => start >= yearEnd && end >= yearStart
+  artist.yearsActives.exists(yearsActive =>
+    yearsActive match
+      case StillActive(since)        => since <= yearEnd
+      case ActiveBetween(start, end) => start >= yearEnd && end >= yearStart
+  )
 }
 
 enum SearchCondition {
@@ -76,7 +78,9 @@ def searchArtists(
 
 // パターンマッチング練習
 def activeLength(artist: Artist, currentYear: Int): Int = {
-  artist.yearsActive match
-    case StillActive(sinse)        => currentYear - sinse
-    case ActiveBetween(start, end) => end - start
+  artist.yearsActives.foldLeft(0)((activeLen, yearsActive) =>
+    yearsActive match
+      case StillActive(sinse)        => activeLen + currentYear - sinse
+      case ActiveBetween(start, end) => activeLen + end - start
+  )
 }

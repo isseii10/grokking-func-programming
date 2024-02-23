@@ -51,25 +51,47 @@ def exchangeTable(from: Currency): IO[Map[Currency, BigDecimal]] = {
     )
 }
 
+import fs2._
+import cats.syntax.all._
+def rates(from: Currency, to: Currency): Stream[IO, BigDecimal] = {
+  Stream
+    .eval(exchangeTable(from))
+    .repeat
+    .map(extractSingleCurrencyRate(to))
+    .unNone
+    .orElse(rates(from, to))
+}
+
 import cats.syntax.traverse._
 def lastRates(from: Currency, to: Currency, n: Int): IO[List[BigDecimal]] = {
   List.range(0, n).map(_ => currencyRate(from, to)).sequence
 }
+import scala.concurrent.duration._
+import java.util.concurrent._
+val delay: FiniteDuration = FiniteDuration(1, TimeUnit.SECONDS)
+val ticks: Stream[IO, Unit] = Stream.fixedRate[IO](delay)
 
 def exchangeIfTranding(
     amount: BigDecimal,
     from: Currency,
     to: Currency
 ): IO[BigDecimal] = {
-  // lastRates(from, to).map(rates =>
-  //   if (trending(rates)) Some(amount * rates.last) else None
-  // )
-  for {
-    rates <- lastRates(from, to, 3)
-    result <-
-      if (trending(rates)) IO.pure(amount * rates.last)
-      else exchangeIfTranding(amount, from, to)
-  } yield result
+  // for {
+  //   rates <- lastRates(from, to, 3)
+  //   result <-
+  //     if (trending(rates)) IO.pure(amount * rates.last)
+  //     else exchangeIfTranding(amount, from, to)
+  // } yield result
+  rates(from, to)
+    .zipLeft(ticks) // zipのペアが揃うまでタプルが作られないため1秒間隔のticksとzipすることで1秒感覚でratesが呼ばれる
+    .sliding(3) // sliding window
+    .map(_.toList)
+    .filter(trending)
+    .map(_.last)
+    .take(1)
+    .compile
+    .lastOrError
+    .map(_ * amount)
 }
 
 def currencyRate(from: Currency, to: Currency): IO[BigDecimal] = {
